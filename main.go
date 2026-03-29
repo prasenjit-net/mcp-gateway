@@ -11,14 +11,14 @@ import (
 	"syscall"
 	"time"
 
-	"mcp-gateway/admin"
-	"mcp-gateway/auth"
-	"mcp-gateway/config"
-	"mcp-gateway/mcp"
-	"mcp-gateway/proxy"
-	"mcp-gateway/registry"
-	"mcp-gateway/store"
-	"mcp-gateway/telemetry"
+	"github.com/prasenjit-net/mcp-gateway/admin"
+	"github.com/prasenjit-net/mcp-gateway/auth"
+	"github.com/prasenjit-net/mcp-gateway/config"
+	"github.com/prasenjit-net/mcp-gateway/mcp"
+	"github.com/prasenjit-net/mcp-gateway/proxy"
+	"github.com/prasenjit-net/mcp-gateway/registry"
+	"github.com/prasenjit-net/mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/telemetry"
 )
 
 func main() {

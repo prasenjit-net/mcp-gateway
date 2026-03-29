@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"mcp-gateway/config"
-	"mcp-gateway/mcp"
-	"mcp-gateway/registry"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/config"
+	"github.com/prasenjit-net/mcp-gateway/mcp"
+	"github.com/prasenjit-net/mcp-gateway/registry"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 type Deps struct {

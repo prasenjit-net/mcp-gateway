@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"mcp-gateway/config"
-	"mcp-gateway/registry"
-	"mcp-gateway/spec"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/config"
+	"github.com/prasenjit-net/mcp-gateway/registry"
+	"github.com/prasenjit-net/mcp-gateway/spec"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 type specsHandler struct {

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 type ToolDefinition struct {

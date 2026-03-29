@@ -3,7 +3,7 @@ package registry
 import (
 	"sync"
 
-	"mcp-gateway/spec"
+	"github.com/prasenjit-net/mcp-gateway/spec"
 )
 
 type Registry struct {

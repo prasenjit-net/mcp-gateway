@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strings"
 
-	"mcp-gateway/auth"
-	"mcp-gateway/spec"
+	"github.com/prasenjit-net/mcp-gateway/auth"
+	"github.com/prasenjit-net/mcp-gateway/spec"
 )
 
 type BuildInput struct {

@@ -1,4 +1,4 @@
-module mcp-gateway
+module github.com/prasenjit-net/mcp-gateway
 
 go 1.23
 

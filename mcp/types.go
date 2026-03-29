@@ -3,7 +3,7 @@ package mcp
 import (
 	"encoding/json"
 
-	"mcp-gateway/proxy"
+	"github.com/prasenjit-net/mcp-gateway/proxy"
 )
 
 const MCPVersion = "2024-11-05"

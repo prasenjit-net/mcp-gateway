@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"mcp-gateway/auth"
-	"mcp-gateway/telemetry"
+	"github.com/prasenjit-net/mcp-gateway/auth"
+	"github.com/prasenjit-net/mcp-gateway/telemetry"
 )
 
 type SSEServer struct {

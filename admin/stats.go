@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"mcp-gateway/mcp"
-	"mcp-gateway/registry"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/mcp"
+	"github.com/prasenjit-net/mcp-gateway/registry"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 var startTime = time.Now()

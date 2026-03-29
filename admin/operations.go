@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"mcp-gateway/config"
-	"mcp-gateway/registry"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/config"
+	"github.com/prasenjit-net/mcp-gateway/registry"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 type opsHandler struct {

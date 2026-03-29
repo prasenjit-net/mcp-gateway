@@ -3,8 +3,8 @@ package auth
 import (
 	"net/http"
 
-	"mcp-gateway/spec"
-	"mcp-gateway/store"
+	"github.com/prasenjit-net/mcp-gateway/spec"
+	"github.com/prasenjit-net/mcp-gateway/store"
 )
 
 type Authenticator interface {

@@ -1,0 +1,48 @@
+# ── Binary ───────────────────────────────────────────────────────────────────
+mcp-gateway
+mcp-gateway.exe
+
+# ── Go ───────────────────────────────────────────────────────────────────────
+*.test
+*.out
+coverage.html
+/vendor/
+
+# ── Data directory (runtime state — never commit) ────────────────────────────
+/data/
+
+# ── UI build artifacts ───────────────────────────────────────────────────────
+ui/dist/
+ui/node_modules/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+*.secret
+gateway.yaml        # may contain local overrides; use gateway.yaml.example instead
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverrideIcon
+._*
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS temp files ─────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+.dockerignore-local
+
+# ── Test / coverage ───────────────────────────────────────────────────────────
+*.prof
+cpu.out
+mem.out
