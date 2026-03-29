@@ -1,0 +1,93 @@
+package proxy
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"mcp-gateway/auth"
+	"mcp-gateway/spec"
+)
+
+type BuildInput struct {
+	Tool        *spec.ToolDefinition
+	Arguments   map[string]interface{}
+	InboundAuth *auth.InboundAuth
+	Configured  auth.Authenticator
+}
+
+func Build(ctx context.Context, input BuildInput) (*http.Request, error) {
+	tool := input.Tool
+	args := make(map[string]interface{})
+	for k, v := range input.Arguments {
+		args[k] = v
+	}
+
+	pathStr := tool.PathTemplate
+	for k, v := range args {
+		placeholder := "{" + k + "}"
+		if strings.Contains(pathStr, placeholder) {
+			pathStr = strings.ReplaceAll(pathStr, placeholder, fmt.Sprintf("%v", v))
+			delete(args, k)
+		}
+	}
+
+	rawURL := strings.TrimRight(tool.Upstream, "/") + pathStr
+
+	var req *http.Request
+	var err error
+
+	method := strings.ToUpper(tool.Method)
+
+	switch method {
+	case "GET", "DELETE", "HEAD":
+		req, err = http.NewRequestWithContext(ctx, method, rawURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) > 0 {
+			q := req.URL.Query()
+			for k, v := range args {
+				q.Set(k, fmt.Sprintf("%v", v))
+			}
+			req.URL.RawQuery = q.Encode()
+		}
+	default:
+		var bodyBytes []byte
+		if len(args) > 0 {
+			bodyBytes, err = json.Marshal(args)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var bodyReader *bytes.Reader
+		if bodyBytes != nil {
+			bodyReader = bytes.NewReader(bodyBytes)
+		} else {
+			bodyReader = bytes.NewReader([]byte{})
+		}
+		req, err = http.NewRequestWithContext(ctx, method, rawURL, bodyReader)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) > 0 {
+			req.Header.Set("Content-Type", "application/json")
+		}
+	}
+
+	if _, err := url.ParseRequestURI(rawURL); err != nil {
+		return nil, fmt.Errorf("invalid upstream URL: %w", err)
+	}
+
+	req.Header.Set("X-MCP-Gateway", "1")
+
+	if err := auth.ApplyChain(req, input.InboundAuth, input.Tool, input.Configured); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
