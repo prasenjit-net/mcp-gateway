@@ -28,9 +28,9 @@ info:
     ## Task priorities
     `low`, `medium`, `high`, `critical`
 
-contact:
-  name: MCP Gateway Test
-  url: https://github.com/prasenjit-net/mcp-gateway
+  contact:
+    name: MCP Gateway Test
+    url: https://github.com/prasenjit-net/mcp-gateway
 
 servers:
   - url: http://localhost:8081
