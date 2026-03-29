@@ -19,7 +19,8 @@ ui/node_modules/
 .env
 .env.*
 *.secret
-gateway.yaml        # may contain local overrides; use gateway.yaml.example instead
+gateway.yaml        # legacy config name; ignored to avoid committing secrets
+config.toml         # may contain secrets (openai_api_key etc.); use config.toml.example instead
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store

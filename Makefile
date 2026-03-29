@@ -53,7 +53,7 @@ run: build
 	DATA_DIR=$(DATA_DIR) \
 	LOG_LEVEL=$(LOG_LEVEL) \
 	GATEWAY_SECRET=$(GATEWAY_SECRET) \
-	./$(BINARY)
+	./$(BINARY) serve
 
 # Development mode: Go backend + Vite dev server in parallel (hot-reload UI)
 # Opens the admin UI in the browser automatically.
