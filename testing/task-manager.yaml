@@ -1,0 +1,853 @@
+openapi: 3.0.3
+
+info:
+  title: Task Manager API
+  version: 1.0.0
+  description: |
+    A simple task management REST API for testing the MCP Gateway.
+
+    This spec is intentionally well-documented so that MCP tools auto-generated
+    from it have rich, useful descriptions for AI agents. Every operation has:
+    - A concise `summary` (shown as the tool headline)
+    - A detailed `description` (shown in the tool description)
+    - Fully annotated parameters with examples
+    - Documented response schemas
+
+    **Base URL when running locally:** `http://localhost:8081`
+
+    ## Data model
+
+    - **Project** — a container for tasks (has id, name, description, colour)
+    - **Task** — a unit of work inside a project (has id, title, description,
+      status, priority, due date, assignee)
+    - **Comment** — a note attached to a task
+
+    ## Task statuses
+    `todo` → `in_progress` → `done` | `cancelled`
+
+    ## Task priorities
+    `low`, `medium`, `high`, `critical`
+
+contact:
+  name: MCP Gateway Test
+  url: https://github.com/prasenjit-net/mcp-gateway
+
+servers:
+  - url: http://localhost:8081
+    description: Local mock server (run `make mock` to start)
+
+tags:
+  - name: Projects
+    description: Manage projects that group tasks together
+  - name: Tasks
+    description: Create, update, and track individual tasks
+  - name: Comments
+    description: Add and retrieve comments on tasks
+  - name: Search
+    description: Cross-resource search and filtering
+
+# ─── Paths ─────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Projects ────────────────────────────────────────────────────────────
+
+  /projects:
+    get:
+      operationId: listProjects
+      summary: List all projects
+      description: |
+        Returns a paginated list of all projects. Use `limit` and `offset` to
+        page through results. Projects are returned newest-first by default.
+        Use `sort` to change ordering.
+      tags: [Projects]
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of projects to return (1–100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: offset
+          in: query
+          description: Number of projects to skip for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+        - name: sort
+          in: query
+          description: >
+            Sort order. Options: `created_desc` (newest first, default),
+            `created_asc` (oldest first), `name_asc` (alphabetical),
+            `name_desc` (reverse alphabetical).
+          schema:
+            type: string
+            enum: [created_desc, created_asc, name_asc, name_desc]
+            default: created_desc
+      responses:
+        '200':
+          description: Paginated list of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  total:
+                    type: integer
+                    description: Total number of projects (for pagination)
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+              example:
+                data:
+                  - id: "proj_01"
+                    name: "Website Redesign"
+                    description: "Revamp the company website"
+                    colour: "#6366f1"
+                    task_count: 12
+                    created_at: "2025-01-15T10:00:00Z"
+                total: 1
+                limit: 20
+                offset: 0
+
+    post:
+      operationId: createProject
+      summary: Create a new project
+      description: |
+        Creates a new project. A project is a container for tasks.
+        The `name` is required and must be unique within the workspace.
+        Optionally supply a `description` and a hex `colour` for visual
+        identification in the UI.
+      tags: [Projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Unique display name for the project
+                  minLength: 1
+                  maxLength: 100
+                  example: "Website Redesign"
+                description:
+                  type: string
+                  description: Optional longer description of the project's purpose
+                  maxLength: 500
+                  example: "Revamp the public-facing company website for Q3 launch"
+                colour:
+                  type: string
+                  description: Hex colour code used to visually identify the project
+                  pattern: '^#[0-9a-fA-F]{6}$'
+                  example: "#6366f1"
+      responses:
+        '201':
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: A project with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      summary: Get a project by ID
+      description: |
+        Returns full details of a single project including its task counts
+        broken down by status. Use this to check a project's overall progress
+        before drilling into individual tasks.
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      operationId: updateProject
+      summary: Update a project
+      description: |
+        Partially update a project's metadata. Only the fields you include in
+        the request body will be changed; omitted fields remain unchanged.
+        You can rename the project, update its description, or change its colour.
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: New name for the project
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  description: New description
+                  maxLength: 500
+                colour:
+                  type: string
+                  description: New hex colour
+                  pattern: '^#[0-9a-fA-F]{6}$'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteProject
+      summary: Delete a project
+      description: |
+        Permanently deletes a project and **all tasks within it**. This action
+        cannot be undone. If you only want to archive the project, use
+        `PATCH /projects/{projectId}` to set `archived: true` instead.
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '204':
+          description: Project deleted successfully (no content)
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Tasks ────────────────────────────────────────────────────────────────
+
+  /projects/{projectId}/tasks:
+    get:
+      operationId: listTasks
+      summary: List tasks in a project
+      description: |
+        Returns all tasks belonging to a project. Filter by `status` or
+        `priority` to narrow the results. Results are sorted by creation date
+        (newest first) unless overridden with `sort`.
+
+        Typical use: "show me all high-priority open tasks in project X"
+        → `GET /projects/proj_01/tasks?status=todo&priority=high`
+      tags: [Tasks]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: status
+          in: query
+          description: >
+            Filter by task status. Options: `todo`, `in_progress`, `done`,
+            `cancelled`. Omit to return tasks of all statuses.
+          schema:
+            type: string
+            enum: [todo, in_progress, done, cancelled]
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: assignee
+          in: query
+          description: Filter by assignee username or user ID
+          schema:
+            type: string
+          example: "alice"
+        - name: due_before
+          in: query
+          description: Return only tasks due before this date (ISO 8601)
+          schema:
+            type: string
+            format: date
+          example: "2025-06-30"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      operationId: createTask
+      summary: Create a task in a project
+      description: |
+        Creates a new task inside the specified project. The `title` is the
+        only required field. New tasks start with status `todo` by default.
+
+        Tips for AI agents:
+        - Set `priority` to `high` or `critical` for urgent work
+        - Use `due_date` (YYYY-MM-DD) for deadline-driven tasks
+        - Set `assignee` to a username to assign the task immediately
+      tags: [Tasks]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  description: Short, descriptive title of the task
+                  minLength: 1
+                  maxLength: 200
+                  example: "Implement login page"
+                description:
+                  type: string
+                  description: >
+                    Detailed description of what needs to be done. Supports
+                    plain text. Include acceptance criteria here.
+                  example: "Build the login page with email/password fields and OAuth buttons"
+                priority:
+                  type: string
+                  description: Task priority level
+                  enum: [low, medium, high, critical]
+                  default: medium
+                due_date:
+                  type: string
+                  format: date
+                  description: Optional deadline (YYYY-MM-DD)
+                  example: "2025-07-15"
+                assignee:
+                  type: string
+                  description: Username of the person responsible for this task
+                  example: "alice"
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/tasks/{taskId}:
+    get:
+      operationId: getTask
+      summary: Get a task by ID
+      description: |
+        Returns full details of a single task including its description,
+        current status, priority, due date, assignee, and comment count.
+        Use this to read the full context of a task before updating it.
+      tags: [Tasks]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      operationId: updateTask
+      summary: Update a task
+      description: |
+        Partially update a task. Any combination of fields can be updated in
+        a single call. Typical operations:
+
+        - **Move to in-progress**: `{ "status": "in_progress" }`
+        - **Mark done**: `{ "status": "done" }`
+        - **Reassign**: `{ "assignee": "bob" }`
+        - **Escalate priority**: `{ "priority": "critical" }`
+        - **Update description**: `{ "description": "new details..." }`
+        - **Set deadline**: `{ "due_date": "2025-08-01" }`
+      tags: [Tasks]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/taskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [todo, in_progress, done, cancelled]
+                  description: New status for the task
+                priority:
+                  type: string
+                  enum: [low, medium, high, critical]
+                due_date:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Set to null to remove the due date
+                assignee:
+                  type: string
+                  nullable: true
+                  description: Set to null to unassign the task
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteTask
+      summary: Delete a task
+      description: |
+        Permanently deletes a task and all its comments. This cannot be undone.
+        Consider using `PATCH` to set `status: cancelled` if you want to keep
+        the task history visible.
+      tags: [Tasks]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '204':
+          description: Task deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Comments ─────────────────────────────────────────────────────────────
+
+  /projects/{projectId}/tasks/{taskId}/comments:
+    get:
+      operationId: listComments
+      summary: List comments on a task
+      description: |
+        Returns all comments attached to a task in chronological order
+        (oldest first). Comments are used to discuss progress, blockers,
+        and decisions related to the task.
+      tags: [Comments]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  total:
+                    type: integer
+
+    post:
+      operationId: addComment
+      summary: Add a comment to a task
+      description: |
+        Adds a new comment to the specified task. Use comments to:
+        - Report progress updates
+        - Ask questions or flag blockers
+        - Document decisions or context
+        - Leave notes for future reference
+
+        The `author` field defaults to the authenticated user if omitted.
+      tags: [Comments]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/taskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  description: The comment text (plain text, max 2000 characters)
+                  minLength: 1
+                  maxLength: 2000
+                  example: "Investigated the issue — turns out it's a caching bug. Working on a fix."
+                author:
+                  type: string
+                  description: Username of the comment author (defaults to authenticated user)
+                  example: "alice"
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Search ───────────────────────────────────────────────────────────────
+
+  /search:
+    get:
+      operationId: searchTasks
+      summary: Search tasks across all projects
+      description: |
+        Full-text search across task titles and descriptions in all projects.
+        Useful when you don't know which project a task belongs to, or want
+        to find related tasks across multiple projects.
+
+        The `q` parameter searches both `title` and `description` fields.
+        Results are ranked by relevance. Apply `status` or `priority` filters
+        to narrow results further.
+
+        Example: "find all critical tasks mentioning 'login'"
+        → `GET /search?q=login&priority=critical`
+      tags: [Search]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query — matches task titles and descriptions
+          schema:
+            type: string
+            minLength: 1
+          example: "login page"
+        - name: status
+          in: query
+          description: Filter results by status
+          schema:
+            type: string
+            enum: [todo, in_progress, done, cancelled]
+        - name: priority
+          in: query
+          description: Filter results by priority
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: project_id
+          in: query
+          description: Scope search to a specific project
+          schema:
+            type: string
+          example: "proj_01"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Matching tasks with relevance scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Task'
+                        - type: object
+                          properties:
+                            project_name:
+                              type: string
+                              description: Name of the project this task belongs to
+                            score:
+                              type: number
+                              description: Relevance score (higher = better match)
+                  total:
+                    type: integer
+
+  /stats:
+    get:
+      operationId: getWorkspaceStats
+      summary: Get workspace-wide statistics
+      description: |
+        Returns aggregate statistics across the entire workspace — useful for
+        giving an AI agent a high-level overview before deciding what to act on.
+
+        Includes:
+        - Total tasks by status (todo / in_progress / done / cancelled)
+        - Total tasks by priority
+        - Number of overdue tasks (past due_date and not done/cancelled)
+        - Most active projects (by task count)
+      tags: [Search]
+      responses:
+        '200':
+          description: Workspace statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceStats'
+              example:
+                tasks_by_status:
+                  todo: 24
+                  in_progress: 8
+                  done: 103
+                  cancelled: 5
+                tasks_by_priority:
+                  low: 15
+                  medium: 62
+                  high: 43
+                  critical: 20
+                overdue_tasks: 3
+                total_projects: 5
+
+# ─── Components ────────────────────────────────────────────────────────────
+
+components:
+
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      description: Unique identifier of the project
+      schema:
+        type: string
+      example: "proj_01"
+
+    taskId:
+      name: taskId
+      in: path
+      required: true
+      description: Unique identifier of the task
+      schema:
+        type: string
+      example: "task_42"
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    Project:
+      type: object
+      description: A project groups related tasks together
+      properties:
+        id:
+          type: string
+          description: Unique project identifier
+          example: "proj_01"
+        name:
+          type: string
+          description: Human-readable project name
+          example: "Website Redesign"
+        description:
+          type: string
+          description: Optional description of the project's purpose
+        colour:
+          type: string
+          description: Hex colour for UI display
+          example: "#6366f1"
+        task_count:
+          type: integer
+          description: Total number of tasks in this project
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectDetail:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            tasks_by_status:
+              type: object
+              description: Task counts broken down by status
+              properties:
+                todo:
+                  type: integer
+                in_progress:
+                  type: integer
+                done:
+                  type: integer
+                cancelled:
+                  type: integer
+
+    Task:
+      type: object
+      description: A unit of work within a project
+      properties:
+        id:
+          type: string
+          description: Unique task identifier
+          example: "task_42"
+        project_id:
+          type: string
+          description: ID of the project this task belongs to
+        title:
+          type: string
+          description: Short title of the task
+          example: "Implement login page"
+        status:
+          type: string
+          enum: [todo, in_progress, done, cancelled]
+          description: Current status of the task
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Priority level
+        assignee:
+          type: string
+          nullable: true
+          description: Username of the assigned person
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          description: Deadline (YYYY-MM-DD)
+        comment_count:
+          type: integer
+          description: Number of comments on this task
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskDetail:
+      allOf:
+        - $ref: '#/components/schemas/Task'
+        - type: object
+          properties:
+            description:
+              type: string
+              description: Full task description with acceptance criteria
+
+    Comment:
+      type: object
+      description: A comment attached to a task
+      properties:
+        id:
+          type: string
+          description: Unique comment identifier
+        task_id:
+          type: string
+          description: ID of the task this comment belongs to
+        body:
+          type: string
+          description: Comment text
+          example: "Fixed in PR #47 — waiting for review"
+        author:
+          type: string
+          description: Username of the comment author
+        created_at:
+          type: string
+          format: date-time
+
+    WorkspaceStats:
+      type: object
+      properties:
+        tasks_by_status:
+          type: object
+          properties:
+            todo: { type: integer }
+            in_progress: { type: integer }
+            done: { type: integer }
+            cancelled: { type: integer }
+        tasks_by_priority:
+          type: object
+          properties:
+            low: { type: integer }
+            medium: { type: integer }
+            high: { type: integer }
+            critical: { type: integer }
+        overdue_tasks:
+          type: integer
+          description: Tasks past their due_date that are not done or cancelled
+        total_projects:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "project not found"
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "NOT_FOUND"
