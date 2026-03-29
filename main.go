@@ -83,9 +83,7 @@ func main() {
 			rp.ServeHTTP(w, r)
 		})
 	} else {
-		mux.HandleFunc("GET /_ui/", func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "UI not built yet", http.StatusNotFound)
-		})
+		mux.Handle("GET /_ui/", uiHandler())
 	}
 
 	server := &http.Server{
