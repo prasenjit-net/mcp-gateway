@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    name: Release (${{ inputs.bump }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: version
+        run: |
+          # Get latest semver tag; default to v0.0.0 if none exist
+          LATEST=$(git tag --list 'v*.*.*' | sort -V | tail -1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          echo "Previous version: $LATEST"
+
+          # Strip leading 'v'
+          SEMVER="${LATEST#v}"
+          MAJOR=$(echo "$SEMVER" | cut -d. -f1)
+          MINOR=$(echo "$SEMVER" | cut -d. -f2)
+          PATCH=$(echo "$SEMVER" | cut -d. -f3)
+
+          case "${{ inputs.bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "Next version: $NEXT"
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Build UI
+        run: npm run build
+        working-directory: ui
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go test
+        run: go test ./...
+
+      # Build for all target platforms
+      - name: Build binaries
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          mkdir -p dist
+
+          targets=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+            "windows/amd64"
+          )
+
+          for target in "${targets[@]}"; do
+            OS="${target%/*}"
+            ARCH="${target#*/}"
+            OUT="dist/mcp-gateway-${OS}-${ARCH}"
+            if [ "$OS" = "windows" ]; then
+              OUT="${OUT}.exe"
+            fi
+            echo "Building $OUT ..."
+            GOOS=$OS GOARCH=$ARCH go build \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o "$OUT" .
+          done
+
+          ls -lh dist/
+
+      - name: Create checksums
+        working-directory: dist
+        run: sha256sum * > checksums.txt && cat checksums.txt
+
+      - name: Tag and push
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "MCP Gateway ${{ steps.version.outputs.tag }}"
+          body: |
+            ## MCP Gateway ${{ steps.version.outputs.tag }}
+
+            Released by @${{ github.actor }} via `${{ inputs.bump }}` bump.
+
+            ### Downloads
+            | Platform | Architecture | File |
+            |----------|-------------|------|
+            | Linux | amd64 | `mcp-gateway-linux-amd64` |
+            | Linux | arm64 | `mcp-gateway-linux-arm64` |
+            | macOS | amd64 (Intel) | `mcp-gateway-darwin-amd64` |
+            | macOS | arm64 (Apple Silicon) | `mcp-gateway-darwin-arm64` |
+            | Windows | amd64 | `mcp-gateway-windows-amd64.exe` |
+
+            Verify downloads with `checksums.txt`.
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

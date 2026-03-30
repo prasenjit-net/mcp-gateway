@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/prasenjit-net/mcp-gateway/auth"
+	"github.com/prasenjit-net/mcp-gateway/buildinfo"
 	"github.com/prasenjit-net/mcp-gateway/config"
 	"github.com/prasenjit-net/mcp-gateway/proxy"
 	"github.com/prasenjit-net/mcp-gateway/registry"
@@ -69,7 +70,7 @@ func (h *HandlerDeps) handleInitialize(req *Request) *Response {
 		},
 		ServerInfo: ServerInfo{
 			Name:    "mcp-gateway",
-			Version: "0.1.0",
+			Version: buildinfo.Version,
 		},
 	}
 	return &Response{JSONRPC: "2.0", ID: req.ID, Result: result}

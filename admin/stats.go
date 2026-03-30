@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prasenjit-net/mcp-gateway/buildinfo"
 	"github.com/prasenjit-net/mcp-gateway/mcp"
 	"github.com/prasenjit-net/mcp-gateway/registry"
 	"github.com/prasenjit-net/mcp-gateway/store"
@@ -66,7 +67,7 @@ func (h *statsHandler) Health(w http.ResponseWriter, r *http.Request) {
 	result := map[string]interface{}{
 		"status":  "ok",
 		"uptime":  uptime.String(),
-		"version": "0.1.0",
+		"version": buildinfo.Version,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)

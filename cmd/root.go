@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/prasenjit-net/mcp-gateway/buildinfo"
 )
 
 const usageText = `MCP Gateway — wrap REST APIs as MCP tools
@@ -39,6 +41,8 @@ func Execute(opts Options) {
 		runInit(os.Args[2:])
 	case "serve":
 		runServe(os.Args[2:], opts)
+	case "version":
+		fmt.Printf("mcp-gateway %s\n", buildinfo.Version)
 	case "-h", "--help", "help":
 		fmt.Print(usageText)
 	default:
