@@ -13,6 +13,7 @@ type SpecRecord struct {
 	PassthroughAuth    bool      `json:"passthrough_auth"`
 	PassthroughCookies bool      `json:"passthrough_cookies"`
 	PassthroughHeaders []string  `json:"passthrough_headers"`
+	MTLSEnabled        bool      `json:"mtls_enabled"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }

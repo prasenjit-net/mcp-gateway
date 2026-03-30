@@ -3,7 +3,7 @@ import { useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSpec, toggleOperation, updateSpec, type OperationRecord } from '../lib/api'
 import MethodBadge from '../components/MethodBadge'
-import { ArrowLeft, Copy, Check, Search, ChevronDown, Pencil, X, Save } from 'lucide-react'
+import { ArrowLeft, Copy, Check, Search, ChevronDown, Pencil, X, Save, Lock } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '../lib/utils'
 
@@ -18,13 +18,14 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function SpecSettings({ spec, specId }: { spec: { name: string; upstream_url: string; passthrough_auth: boolean; passthrough_cookies: boolean; passthrough_headers: string[] }; specId: string }) {
+function SpecSettings({ spec, specId }: { spec: { name: string; upstream_url: string; passthrough_auth: boolean; passthrough_cookies: boolean; passthrough_headers: string[]; mtls_enabled: boolean }; specId: string }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(spec.name)
   const [upstreamUrl, setUpstreamUrl] = useState(spec.upstream_url)
   const [passthroughAuth, setPassthroughAuth] = useState(spec.passthrough_auth)
   const [passthroughCookies, setPassthroughCookies] = useState(spec.passthrough_cookies)
+  const [mtlsEnabled, setMtlsEnabled] = useState(spec.mtls_enabled)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -33,6 +34,7 @@ function SpecSettings({ spec, specId }: { spec: { name: string; upstream_url: st
     setUpstreamUrl(spec.upstream_url)
     setPassthroughAuth(spec.passthrough_auth)
     setPassthroughCookies(spec.passthrough_cookies)
+    setMtlsEnabled(spec.mtls_enabled)
     setSaveError('')
     setEditing(true)
   }
@@ -48,6 +50,7 @@ function SpecSettings({ spec, specId }: { spec: { name: string; upstream_url: st
         upstream_url: upstreamUrl.trim(),
         passthrough_auth: passthroughAuth,
         passthrough_cookies: passthroughCookies,
+        mtls_enabled: mtlsEnabled,
       })
       void queryClient.invalidateQueries({ queryKey: ['spec', specId] })
       setEditing(false)
@@ -112,6 +115,13 @@ function SpecSettings({ spec, specId }: { spec: { name: string; upstream_url: st
               passthroughCookies ? 'translate-x-4' : 'translate-x-1')} />
           </button>
           <span className="text-sm text-gray-300">Passthrough Cookies</span>
+        </label>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input type="checkbox" checked={mtlsEnabled} onChange={e => setMtlsEnabled(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-600 bg-gray-800" />
+          <span className="text-sm text-gray-300 flex items-center gap-1.5">
+            <Lock className="w-4 h-4 text-purple-400" /> Use mTLS for upstream requests
+          </span>
         </label>
       </div>
 
@@ -198,6 +208,11 @@ export default function SpecDetail() {
         <div className="flex gap-2">
           {spec.passthrough_auth && <span className="px-2 py-1 bg-blue-900/50 text-blue-300 text-xs rounded border border-blue-800">Passthrough Auth</span>}
           {spec.passthrough_cookies && <span className="px-2 py-1 bg-purple-900/50 text-purple-300 text-xs rounded border border-purple-800">Passthrough Cookies</span>}
+          {spec.mtls_enabled && (
+            <span className="px-2 py-1 bg-purple-900/50 text-purple-300 text-xs rounded border border-purple-700 flex items-center gap-1">
+              <Lock className="w-3 h-3" /> mTLS
+            </span>
+          )}
           {spec.passthrough_headers?.length > 0 && (
             <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded">+{spec.passthrough_headers.length} headers</span>
           )}

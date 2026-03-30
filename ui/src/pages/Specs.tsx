@@ -69,7 +69,7 @@ function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => void })
     const headers = passthroughHeadersRaw.split(',').map(h => h.trim()).filter(Boolean)
     mutation.mutate({
       file,
-      payload: { name, upstream_url: upstreamUrl, passthrough_auth: passthroughAuth, passthrough_cookies: passthroughCookies, passthrough_headers: headers },
+      payload: { name, upstream_url: upstreamUrl, passthrough_auth: passthroughAuth, passthrough_cookies: passthroughCookies, passthrough_headers: headers, mtls_enabled: false },
     })
   }
 

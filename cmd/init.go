@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/prasenjit-net/mcp-gateway/config"
+	"github.com/prasenjit-net/mcp-gateway/tlsutil"
 )
 
 func runInit(args []string) {
@@ -47,6 +48,15 @@ Options:
 		os.Exit(1)
 	}
 	fmt.Printf("data directory ready: %s\n", cfg.DataDir)
+
+	// --- TLS certificate ---------------------------------------------------
+	if err := tlsutil.GenerateSelfSigned(cfg.TLS.CertFile, cfg.TLS.KeyFile); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not generate TLS certificate: %v\n", err)
+	} else {
+		// Check if they already existed (GenerateSelfSigned is idempotent)
+		fmt.Printf("TLS certificate: %s\n", cfg.TLS.CertFile)
+		fmt.Printf("TLS key:         %s\n", cfg.TLS.KeyFile)
+	}
 
 	fmt.Println()
 	fmt.Println("MCP Gateway initialised. Next steps:")

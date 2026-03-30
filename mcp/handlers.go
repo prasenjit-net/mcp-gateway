@@ -112,7 +112,7 @@ func (h *HandlerDeps) handleToolsCall(ctx context.Context, req *Request, inbound
 		}
 	}
 
-	resp, err := h.Proxy.Do(httpReq)
+	resp, err := h.Proxy.DoMTLS(httpReq, tool.MTLSEnabled)
 	latencyMs := time.Since(start).Milliseconds()
 	if err != nil {
 		_ = h.Store.IncrementStats(tool.OperationID, latencyMs, true)

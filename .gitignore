@@ -19,8 +19,10 @@ ui/node_modules/
 .env
 .env.*
 *.secret
-gateway.yaml        # legacy config name; ignored to avoid committing secrets
-config.toml         # may contain secrets (openai_api_key etc.); use config.toml.example instead
+# legacy config name; ignored to avoid committing secrets
+gateway.yaml
+# may contain secrets (openai_api_key etc.); use config.toml.example instead
+config.toml
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store

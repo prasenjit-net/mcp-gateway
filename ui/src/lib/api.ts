@@ -8,6 +8,7 @@ export interface SpecRecord {
   passthrough_auth: boolean
   passthrough_cookies: boolean
   passthrough_headers: string[]
+  mtls_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -47,6 +48,7 @@ export interface UploadSpecPayload {
   passthrough_auth: boolean
   passthrough_cookies: boolean
   passthrough_headers: string[]
+  mtls_enabled: boolean
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -77,6 +79,7 @@ export async function uploadSpec(file: File, payload: UploadSpecPayload): Promis
   fd.append('passthrough_auth', String(payload.passthrough_auth))
   fd.append('passthrough_cookies', String(payload.passthrough_cookies))
   fd.append('passthrough_headers', JSON.stringify(payload.passthrough_headers))
+  fd.append('mtls_enabled', String(payload.mtls_enabled))
   const res = await fetch(`${BASE}/specs`, { method: 'POST', body: fd })
   return handleResponse(res)
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/BurntSushi/toml"
@@ -10,6 +11,18 @@ import (
 
 // DefaultConfigFile is the default config file name used by init and serve.
 const DefaultConfigFile = "config.toml"
+
+type TLSConfig struct {
+	Enabled  bool   `toml:"enabled"`
+	CertFile string `toml:"cert_file"`
+	KeyFile  string `toml:"key_file"`
+}
+
+type MTLSConfig struct {
+	CertFile string `toml:"cert_file"`
+	KeyFile  string `toml:"key_file"`
+	CAFile   string `toml:"ca_file"`
+}
 
 type Config struct {
 	ListenAddr       string `toml:"listen_addr"`
@@ -23,6 +36,9 @@ type Config struct {
 	// The API key is never exposed to the browser.
 	OpenAIAPIKey string `toml:"openai_api_key"`
 	OpenAIModel  string `toml:"openai_model"`
+
+	TLS  TLSConfig  `toml:"tls"`
+	MTLS MTLSConfig `toml:"mtls"`
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -83,6 +99,24 @@ func Load(path string) (*Config, error) {
 		cfg.OpenAIModel = "gpt-4o"
 	}
 
+	// Resolve default TLS paths relative to data_dir.
+	if cfg.TLS.CertFile == "" {
+		cfg.TLS.CertFile = filepath.Join(cfg.DataDir, "server.crt")
+	}
+	if cfg.TLS.KeyFile == "" {
+		cfg.TLS.KeyFile = filepath.Join(cfg.DataDir, "server.key")
+	}
+	// mTLS defaults to the same cert/key as the server TLS cert.
+	if cfg.MTLS.CertFile == "" {
+		cfg.MTLS.CertFile = cfg.TLS.CertFile
+	}
+	if cfg.MTLS.KeyFile == "" {
+		cfg.MTLS.KeyFile = cfg.TLS.KeyFile
+	}
+	if cfg.MTLS.CAFile == "" {
+		cfg.MTLS.CAFile = cfg.TLS.CertFile
+	}
+
 	return cfg, nil
 }
 
@@ -107,4 +141,22 @@ max_response_bytes = 1048576
 # The key is never sent to the browser.
 # openai_api_key = "sk-..."
 openai_model = "gpt-4o"
+
+# ── TLS (server) ──────────────────────────────────────────────────────────────
+# When enabled, the server serves both HTTP and HTTPS on the same port via cmux.
+# cert_file defaults to {data_dir}/server.crt
+# key_file  defaults to {data_dir}/server.key
+[tls]
+enabled = false
+# cert_file = "data/server.crt"
+# key_file  = "data/server.key"
+
+# ── mTLS (upstream client certificate) ───────────────────────────────────────
+# Configure a client certificate to present to upstream servers that require mTLS.
+# Enable mTLS per-spec in the admin UI.
+# Defaults to the same cert/key as [tls] when not set.
+[mtls]
+# cert_file = "data/server.crt"
+# key_file  = "data/server.key"
+# ca_file   = "data/server.crt"
 `

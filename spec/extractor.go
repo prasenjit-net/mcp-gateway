@@ -20,9 +20,10 @@ type ToolDefinition struct {
 	PassthroughAuth    bool
 	PassthroughCookies bool
 	PassthroughHeaders []string
+	MTLSEnabled        bool
 }
 
-func ExtractTools(specID, specName, upstream string, parsed *ParsedSpec, passthroughAuth bool, passthroughCookies bool, passthroughHeaders []string) ([]*ToolDefinition, []*store.OperationRecord, error) {
+func ExtractTools(specID, specName, upstream string, parsed *ParsedSpec, passthroughAuth bool, passthroughCookies bool, passthroughHeaders []string, mtlsEnabled bool) ([]*ToolDefinition, []*store.OperationRecord, error) {
 	var tools []*ToolDefinition
 	var ops []*store.OperationRecord
 
@@ -104,6 +105,7 @@ func ExtractTools(specID, specName, upstream string, parsed *ParsedSpec, passthr
 				PassthroughAuth:    passthroughAuth,
 				PassthroughCookies: passthroughCookies,
 				PassthroughHeaders: passthroughHeaders,
+				MTLSEnabled:        mtlsEnabled,
 			}
 			tools = append(tools, tool)
 

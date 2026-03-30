@@ -27,12 +27,13 @@ func (h *specsHandler) Create(w http.ResponseWriter, r *http.Request) {
 			PassthroughAuth    bool     `json:"passthrough_auth"`
 			PassthroughCookies bool     `json:"passthrough_cookies"`
 			PassthroughHeaders []string `json:"passthrough_headers"`
+			MTLSEnabled        bool     `json:"mtls_enabled"`
 		}
 		if err2 := json.NewDecoder(r.Body).Decode(&body); err2 != nil {
 			jsonError(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		h.createFromRaw(w, body.Name, body.UpstreamURL, []byte(body.SpecRaw), body.PassthroughAuth, body.PassthroughCookies, body.PassthroughHeaders)
+		h.createFromRaw(w, body.Name, body.UpstreamURL, []byte(body.SpecRaw), body.PassthroughAuth, body.PassthroughCookies, body.PassthroughHeaders, body.MTLSEnabled)
 		return
 	}
 
@@ -40,6 +41,7 @@ func (h *specsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	upstreamURL := r.FormValue("upstream_url")
 	passthroughAuth := r.FormValue("passthrough_auth") == "true"
 	passthroughCookies := r.FormValue("passthrough_cookies") == "true"
+	mtlsEnabled := r.FormValue("mtls_enabled") == "true"
 	var passthroughHeaders []string
 	if ph := r.FormValue("passthrough_headers"); ph != "" {
 		json.Unmarshal([]byte(ph), &passthroughHeaders)
@@ -64,10 +66,10 @@ func (h *specsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		specData = []byte(r.FormValue("spec_raw"))
 	}
 
-	h.createFromRaw(w, name, upstreamURL, specData, passthroughAuth, passthroughCookies, passthroughHeaders)
+	h.createFromRaw(w, name, upstreamURL, specData, passthroughAuth, passthroughCookies, passthroughHeaders, mtlsEnabled)
 }
 
-func (h *specsHandler) createFromRaw(w http.ResponseWriter, name, upstreamURL string, specData []byte, passthroughAuth, passthroughCookies bool, passthroughHeaders []string) {
+func (h *specsHandler) createFromRaw(w http.ResponseWriter, name, upstreamURL string, specData []byte, passthroughAuth, passthroughCookies bool, passthroughHeaders []string, mtlsEnabled bool) {
 	if len(specData) == 0 {
 		jsonError(w, "spec_raw or spec file required", http.StatusBadRequest)
 		return
@@ -98,11 +100,12 @@ func (h *specsHandler) createFromRaw(w http.ResponseWriter, name, upstreamURL st
 		PassthroughAuth:    passthroughAuth,
 		PassthroughCookies: passthroughCookies,
 		PassthroughHeaders: passthroughHeaders,
+		MTLSEnabled:        mtlsEnabled,
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
 
-	_, ops, err := spec.ExtractTools(id, name, upstreamURL, parsed, passthroughAuth, passthroughCookies, passthroughHeaders)
+	_, ops, err := spec.ExtractTools(id, name, upstreamURL, parsed, passthroughAuth, passthroughCookies, passthroughHeaders, mtlsEnabled)
 	if err != nil {
 		jsonError(w, "failed to extract tools: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -168,6 +171,7 @@ func (h *specsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		PassthroughAuth    *bool    `json:"passthrough_auth"`
 		PassthroughCookies *bool    `json:"passthrough_cookies"`
 		PassthroughHeaders []string `json:"passthrough_headers"`
+		MTLSEnabled        *bool    `json:"mtls_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "invalid request body", http.StatusBadRequest)
@@ -188,6 +192,9 @@ func (h *specsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.PassthroughHeaders != nil {
 		rec.PassthroughHeaders = body.PassthroughHeaders
+	}
+	if body.MTLSEnabled != nil {
+		rec.MTLSEnabled = *body.MTLSEnabled
 	}
 	rec.UpdatedAt = time.Now()
 
@@ -259,6 +266,7 @@ func RebuildRegistryFromStore(st store.Store, reg *registry.Registry) {
 			specRec.PassthroughAuth,
 			specRec.PassthroughCookies,
 			specRec.PassthroughHeaders,
+			specRec.MTLSEnabled,
 		)
 		if err != nil {
 			continue
