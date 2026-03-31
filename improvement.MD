@@ -1,6 +1,22 @@
 # MCP Gateway — Code Improvement Analysis
 
 > Comprehensive static analysis of the codebase identifying security vulnerabilities, concurrency issues, performance gaps, and missing features. Issues are rated **HIGH**, **MEDIUM**, or **LOW** severity.
+>
+> **Last updated:** March 2026 — items addressed in prior work have been removed.
+
+---
+
+## Recently Addressed ✅
+
+The following issues from the original analysis have been resolved:
+
+| Severity | Area | Resolution |
+|----------|------|-----------|
+| **HIGH** | Admin API unauthenticated | Form-based auth with HMAC-SHA256 signed cookies (`admin/session.go`, `admin/auth_middleware.go`, `admin/login.go`). `/_api/*` → 401 JSON; `/_ui/*` → redirect to login. |
+| **HIGH** | CORS wildcard on admin routes | Replaced hardcoded `*` with configurable `CORSConfig` allowlist (`admin/cors.go`). Secure default: same-origin only. |
+| **MEDIUM** | JSON injection via string concatenation | `jsonString()` helper in `admin/router.go` uses `json.Marshal` instead of string concatenation. |
+| **LOW** | Zero test coverage | Test coverage raised to ≥60% (currently 60.4%) and enforced in `make test`, CI, and release workflows. |
+| **BUG** | TOML config scoping bug | `openai_api_key` was silently ignored when placed after `[cors]`. Moved before all section headers in `DefaultConfigContent`; regression test added. |
 
 ---
 
@@ -24,14 +40,6 @@
 ---
 
 ## 1. Admin Package
-
-### `admin/router.go`
-
-| Severity | Issue | Details |
-|----------|-------|---------|
-| **HIGH** | Overly permissive CORS policy | `Access-Control-Allow-Origin: *` (lines 61, 69) allows any origin to access the API, enabling CSRF attacks from any domain. Replace with an allowlist-based check using the request `Origin` header. |
-| **MEDIUM** | Unsafe JSON error serialisation | `w.Write([]byte(` `` `{"error":"` `` ` + msg + ` `` `"}` `` `))` (line 78) concatenates user-controlled input directly into JSON without escaping, risking JSON injection. Use `json.Marshal` instead. |
-| **MEDIUM** | No input validation middleware | All routes lack validation of path parameters, query strings, and body size limits. Add middleware to enforce `Content-Length` caps and parameter format checks. |
 
 ### `admin/specs.go`
 
@@ -58,6 +66,12 @@
 | **HIGH** | No HTTP client timeout | `http.DefaultClient.Do(req)` (lines 50, 76) has no timeout; a slow or streaming upstream can hang the goroutine indefinitely. Use a client with `Timeout` set. |
 | **MEDIUM** | No streaming response size limit | The read loop (line 67) has no byte cap. Wrap `resp.Body` with `io.LimitReader` to prevent unbounded memory usage. |
 | **MEDIUM** | Write errors ignored | `w.Write(buf[:n])` (line 71) is annotated `//nolint:errcheck`. A disconnected client is never detected, wasting resources until the upstream closes. Check the error and break the loop. |
+
+### `admin/router.go`
+
+| Severity | Issue | Details |
+|----------|-------|---------|
+| **MEDIUM** | No input validation middleware | All routes lack validation of path parameters, query strings, and body size limits. Add middleware to enforce `Content-Length` caps and parameter format checks. |
 
 ### `admin/stats.go`
 
@@ -291,8 +305,6 @@
 
 | Severity | Area | Detail |
 |----------|------|--------|
-| **HIGH** | Admin API has no authentication | All admin endpoints are unauthenticated — any user who can reach the port has full control. Add token or session-based authentication. |
-| **HIGH** | CORS wildcard | `Access-Control-Allow-Origin: *` on admin routes enables CSRF from any domain. |
 | **HIGH** | Path traversal | Multiple unvalidated `filepath.Join` calls using externally sourced path components: `admin/specs.go`, `admin/resources.go`, `mcp/handlers.go`, `store/jsonstore.go`. |
 | **HIGH** | Gateway secret in environment | `/proc/[pid]/environ` is readable by other users on the host. |
 | **MEDIUM** | URL argument injection | User-supplied path and query parameters are not URL-encoded before being placed into upstream request URLs. |
@@ -314,19 +326,16 @@
 | Severity | Area | Detail |
 |----------|------|--------|
 | **MEDIUM** | Store errors silently discarded | `admin/stats.go`, `mcp/handlers.go`, `store/jsonstore.go` all discard error returns with `_`. |
-| **MEDIUM** | JSON injection via string concatenation | `admin/router.go` builds JSON response by string concatenation. |
 | **MEDIUM** | Request body size unlimited | `mcp/http.go` and several admin handlers decode JSON without a `LimitReader`. |
 
 ### Observability & Missing Features
 
 | Severity | Area | Detail |
 |----------|------|--------|
-| **HIGH** | Admin API unauthenticated | See Security above. |
 | **MEDIUM** | No request/response audit logging | Sensitive operations (spec creation, operation enable/disable) leave no audit trail. |
 | **MEDIUM** | No rate limiting | Neither admin API nor MCP endpoint have rate limiting. |
 | **MEDIUM** | No request correlation IDs | Logs cannot be correlated across components. Add `X-Request-ID` middleware. |
 | **MEDIUM** | No circuit breaker for upstream calls | A slow upstream blocks proxy goroutines with no fallback. |
-| **LOW** | Zero test coverage | No `*_test.go` files were found. Add unit tests, especially for auth, proxy, and store logic. |
 | **LOW** | No CI linting | `golangci-lint` or `staticcheck` is not configured. |
 
 ---
@@ -335,49 +344,46 @@
 
 ### Critical — Fix Before Production
 
-1. **Add authentication to the admin API** — currently completely unauthenticated.
-2. **Fix goroutine leaks** — registry subscription (`cmd/serve.go`) and SSE channel (`mcp/sse.go`).
-3. **Fix race conditions** — stat counters (`store/jsonstore.go`), `getAuthenticator` double-check lock, SSE `inbound` auth.
-4. **Restrict CORS** — replace wildcard with an origin allowlist.
-5. **Add path traversal guards** — validate all `filepath.Join` results remain within `DataDir`.
-6. **Enforce request size limits** — wrap all decoded request bodies with `io.LimitReader`.
-7. **Secure gateway secret** — read from a restricted file, not the environment.
+1. **Fix goroutine leaks** — registry subscription (`cmd/serve.go`) and SSE channel (`mcp/sse.go`).
+2. **Fix race conditions** — stat counters (`store/jsonstore.go`), `getAuthenticator` double-check lock, SSE `inbound` auth.
+3. **Add path traversal guards** — validate all `filepath.Join` results remain within `DataDir`.
+4. **Enforce request size limits** — wrap all decoded request bodies with `io.LimitReader`.
+5. **Secure gateway secret** — read from a restricted file, not the environment.
 
 ### High Priority
 
-8. URL-encode user-supplied arguments before inserting into upstream request paths and queries.
-9. Add HTTP client timeouts everywhere (`admin/chat.go`, `auth/oauth2.go`, `proxy/proxy.go`).
-10. Add structured logging and request correlation IDs.
-11. Implement rate limiting on both admin and MCP endpoints.
-12. Add audit logging for all mutating admin operations.
-13. Document and enforce thread-safety contracts on all exported types.
+6. URL-encode user-supplied arguments before inserting into upstream request paths and queries.
+7. Add HTTP client timeouts everywhere (`admin/chat.go`, `auth/oauth2.go`, `proxy/proxy.go`).
+8. Add structured logging and request correlation IDs.
+9. Implement rate limiting on both admin and MCP endpoints.
+10. Add audit logging for all mutating admin operations.
+11. Document and enforce thread-safety contracts on all exported types.
 
 ### Medium Priority
 
-14. Return structured error codes from MCP tool handlers.
-15. Add a circuit breaker for upstream proxy calls.
-16. Validate configuration at startup (`config/config.go`).
-17. Improve OAuth2 token caching — retry on failure, conservative default expiry, deadline on fetch.
-18. Add `HEALTHCHECK` to `Dockerfile` and run container as non-root.
+12. Return structured error codes from MCP tool handlers.
+13. Add a circuit breaker for upstream proxy calls.
+14. Validate configuration at startup (`config/config.go`).
+15. Improve OAuth2 token caching — retry on failure, conservative default expiry, deadline on fetch.
+16. Add `HEALTHCHECK` to `Dockerfile` and run container as non-root.
 
 ### Low Priority
 
-19. Introduce unit and integration tests (currently 0% coverage).
-20. Add `golangci-lint` / `staticcheck` to the CI pipeline.
-21. Use a MIME detection library instead of hardcoded extension mapping.
-22. Make TLS SAN entries configurable.
-23. Embed build timestamp and commit hash in binary.
-24. Pre-allocate slices in registry list methods.
+17. Add `golangci-lint` / `staticcheck` to the CI pipeline.
+18. Use a MIME detection library instead of hardcoded extension mapping.
+19. Make TLS SAN entries configurable.
+20. Embed build timestamp and commit hash in binary.
+21. Pre-allocate slices in registry list methods.
 
 ---
 
 ## Summary Statistics
 
-| Severity | Count |
-|----------|-------|
-| HIGH | 16 |
-| MEDIUM | 42 |
-| LOW | 27 |
-| **Total** | **85+** |
+| Severity | Original | Remaining |
+|----------|----------|-----------|
+| HIGH | 16 | 12 |
+| MEDIUM | 42 | 40 |
+| LOW | 27 | 26 |
+| **Total** | **85+** | **78** |
 
-**Highest-risk areas**: concurrency safety, security hardening (auth & path traversal), error handling, and the complete absence of automated tests.
+**Highest-risk areas**: concurrency safety (goroutine leaks, race conditions), path traversal guards, request body size limits, and error handling.
