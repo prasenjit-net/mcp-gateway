@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -55,6 +56,11 @@ func (s *SSEServer) HandleSSE(w http.ResponseWriter, r *http.Request) {
 		s.sessions.Delete(sessionID)
 		telemetry.ActiveSessions.Dec()
 		cancel()
+		// Drain and close outCh so any goroutine blocked on HandleMessage
+		// writing to this channel is unblocked and can return.
+		close(session.outCh)
+		for range session.outCh {
+		}
 	}()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -111,7 +117,7 @@ func (s *SSEServer) HandleMessage(w http.ResponseWriter, r *http.Request) {
 	session := val.(*sseSession)
 
 	var req Request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, s.deps.Config.MaxRequestBytes)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -129,8 +135,13 @@ func (s *SSEServer) HandleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Send to outCh; use session ctx so we unblock immediately when session ends.
 	select {
 	case session.outCh <- data:
+	case <-session.ctx.Done():
+		// Session ended while we were processing — response is discarded.
+		http.Error(w, "session closed", http.StatusGone)
+		return
 	case <-time.After(200 * time.Millisecond):
 		slog.Warn("session outCh full, dropping response", "sessionId", sessionID)
 	}

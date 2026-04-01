@@ -359,3 +359,28 @@ func TestOAuth2TokenEndpointError(t *testing.T) {
 		t.Error("expected error when token endpoint returns 400")
 	}
 }
+
+func TestOAuth2DefaultExpiry(t *testing.T) {
+// Token endpoint returns no expires_in — should use conservative default (300 s).
+srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+w.Header().Set("Content-Type", "application/json")
+w.Write([]byte(`{"access_token":"tok-default-expiry"}`))
+}))
+defer srv.Close()
+
+cfg := &store.AuthConfig{
+Type:   "oauth2",
+Config: []byte(`{"token_url":"` + srv.URL + `","client_id":"cid","client_secret":"csec"}`),
+}
+a, err := auth.NewAuthenticator(cfg, "")
+if err != nil {
+t.Fatalf("NewAuthenticator: %v", err)
+}
+req, _ := http.NewRequest("GET", "http://example.com", nil)
+if err := a.Apply(req); err != nil {
+t.Fatalf("Apply: %v", err)
+}
+if req.Header.Get("Authorization") != "Bearer tok-default-expiry" {
+t.Errorf("Authorization = %q", req.Header.Get("Authorization"))
+}
+}

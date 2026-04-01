@@ -53,16 +53,20 @@ func (h *resourcesHandler) createFile(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	relDir := filepath.Join("resources", id)
 	absDir := filepath.Join(h.config.DataDir, relDir)
-	if err := os.MkdirAll(absDir, 0755); err != nil {
+	if err := os.MkdirAll(absDir, 0o750); err != nil {
 		jsonError(w, "failed to create storage dir: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	filename := sanitizeFilename(fh.Filename)
 	relPath := filepath.Join(relDir, filename)
-	absPath := filepath.Join(h.config.DataDir, relPath)
+	absPath, err := store.SafeJoin(h.config.DataDir, relPath)
+	if err != nil {
+		jsonError(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
 
-	out, err := os.Create(absPath)
+	out, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		jsonError(w, "failed to create file: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -139,13 +143,17 @@ func (h *resourcesHandler) createJSON(w http.ResponseWriter, r *http.Request) {
 		}
 		relDir := filepath.Join("resources", id)
 		absDir := filepath.Join(h.config.DataDir, relDir)
-		if err := os.MkdirAll(absDir, 0755); err != nil {
+		if err := os.MkdirAll(absDir, 0o750); err != nil {
 			jsonError(w, "failed to create storage dir: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		relPath := filepath.Join(relDir, "content.txt")
-		absPath := filepath.Join(h.config.DataDir, relPath)
-		if err := os.WriteFile(absPath, []byte(body.Content), 0644); err != nil {
+		absPath, err := store.SafeJoin(h.config.DataDir, relPath)
+		if err != nil {
+			jsonError(w, "invalid content path", http.StatusInternalServerError)
+			return
+		}
+		if err := os.WriteFile(absPath, []byte(body.Content), 0o600); err != nil {
 			jsonError(w, "failed to write content: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -290,7 +298,11 @@ func (h *resourcesHandler) GetContent(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "upstream resources have no stored content", http.StatusBadRequest)
 		return
 	}
-	absPath := filepath.Join(h.config.DataDir, rec.FilePath)
+	absPath, err := store.SafeJoin(h.config.DataDir, rec.FilePath)
+	if err != nil {
+		jsonError(w, "invalid resource path", http.StatusInternalServerError)
+		return
+	}
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		jsonError(w, "failed to read content: "+err.Error(), http.StatusInternalServerError)

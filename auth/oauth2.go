@@ -16,6 +16,10 @@ type oauth2Config struct {
 	ClientID     string   `json:"client_id"`
 	ClientSecret string   `json:"client_secret"`
 	Scopes       []string `json:"scopes"`
+	// TimeoutSeconds is the HTTP timeout for token requests (default 10).
+	TimeoutSeconds int `json:"timeout_seconds"`
+	// DefaultExpirySeconds is used when expires_in is absent (default 300).
+	DefaultExpirySeconds int `json:"default_expiry_seconds"`
 }
 
 type oauth2Token struct {
@@ -38,6 +42,12 @@ func newOAuth2Auth(raw json.RawMessage, secret string) (Authenticator, error) {
 		if dec, err := Decrypt(secret, []byte(cfg.ClientSecret)); err == nil {
 			cfg.ClientSecret = string(dec)
 		}
+	}
+	if cfg.TimeoutSeconds <= 0 {
+		cfg.TimeoutSeconds = 10
+	}
+	if cfg.DefaultExpirySeconds <= 0 {
+		cfg.DefaultExpirySeconds = 300
 	}
 	return &oauth2Auth{cfg: cfg}, nil
 }
@@ -73,19 +83,20 @@ func (o *oauth2Auth) fetchToken() (string, error) {
 		data.Set("scope", strings.Join(o.cfg.Scopes, " "))
 	}
 
-	resp, err := http.PostForm(o.cfg.TokenURL, data)
+	client := &http.Client{Timeout: time.Duration(o.cfg.TimeoutSeconds) * time.Second}
+	resp, err := client.PostForm(o.cfg.TokenURL, data)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
 		return "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("token endpoint returned %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -97,8 +108,8 @@ func (o *oauth2Auth) fetchToken() (string, error) {
 	}
 
 	expiresIn := result.ExpiresIn
-	if expiresIn == 0 {
-		expiresIn = 3600
+	if expiresIn <= 0 {
+		expiresIn = o.cfg.DefaultExpirySeconds
 	}
 
 	o.cached = &oauth2Token{

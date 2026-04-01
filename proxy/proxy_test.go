@@ -232,3 +232,54 @@ func TestMapResponseHTMLText(t *testing.T) {
 		t.Errorf("text/* should map to text type, got %q", contents[0].Type)
 	}
 }
+
+func TestBuildDisallowedMethod(t *testing.T) {
+tool := &spec.ToolDefinition{
+Name:         "test",
+Upstream:     "http://example.com",
+PathTemplate: "/path",
+Method:       "TRACE",
+}
+_, err := proxy.Build(context.Background(), proxy.BuildInput{Tool: tool})
+if err == nil {
+t.Error("expected error for disallowed HTTP method TRACE")
+}
+}
+
+func TestBuildPathEscaping(t *testing.T) {
+	tool := &spec.ToolDefinition{
+		Name:         "test",
+		Upstream:     "http://example.com",
+		PathTemplate: "/items/{id}",
+		Method:       "GET",
+	}
+	req, err := proxy.Build(context.Background(), proxy.BuildInput{
+		Tool:      tool,
+		Arguments: map[string]interface{}{"id": "../../etc/passwd"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The slash in the traversal attempt must be percent-encoded in RawPath,
+	// so the upstream receives it as a single opaque path segment, not a traversal.
+	rawPath := req.URL.RawPath
+	if rawPath == "" {
+		rawPath = req.URL.Path // fallback if no encoding needed
+	}
+	if strings.Contains(rawPath, "../") {
+		t.Errorf("raw path contains unencoded traversal: %s", rawPath)
+	}
+}
+
+func TestBuildInvalidUpstreamURL(t *testing.T) {
+tool := &spec.ToolDefinition{
+Name:         "test",
+Upstream:     "not-a-url",
+PathTemplate: "/path",
+Method:       "GET",
+}
+_, err := proxy.Build(context.Background(), proxy.BuildInput{Tool: tool})
+if err == nil {
+t.Error("expected error for invalid upstream URL")
+}
+}

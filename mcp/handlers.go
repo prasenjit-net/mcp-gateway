@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -252,7 +251,10 @@ func (h *HandlerDeps) handleResourcesRead(ctx context.Context, req *Request, inb
 
 	switch record.Type {
 	case "file", "text":
-		filePath := filepath.Join(h.Config.DataDir, record.FilePath)
+		filePath, err := safeJoinDataDir(h.Config.DataDir, record.FilePath)
+		if err != nil {
+			return errResponse(req.ID, -32603, "invalid resource path: "+err.Error())
+		}
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			return errResponse(req.ID, -32603, "error reading resource: "+err.Error())
@@ -303,4 +305,9 @@ func isBinaryMime(mime string) bool {
 		strings.HasPrefix(mime, "video/") ||
 		mime == "application/octet-stream" ||
 		mime == "application/pdf"
+}
+
+// safeJoinDataDir wraps store.SafeJoin for use in mcp handlers.
+func safeJoinDataDir(dataDir, untrusted string) (string, error) {
+	return store.SafeJoin(dataDir, untrusted)
 }

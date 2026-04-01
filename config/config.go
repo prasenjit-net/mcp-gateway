@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -42,8 +43,16 @@ type Config struct {
 	DataDir          string `toml:"data_dir"`
 	LogLevel         string `toml:"log_level"`
 	MaxResponseBytes int64  `toml:"max_response_bytes"`
-	UIDevProxy       string `toml:"ui_dev_proxy"`
-	GatewaySecret    string `toml:"-"` // from GATEWAY_SECRET env only
+	// MaxRequestBytes caps inbound JSON body size (default 1 MiB).
+	MaxRequestBytes int64  `toml:"max_request_bytes"`
+	UIDevProxy      string `toml:"ui_dev_proxy"`
+
+	// GatewaySecret is used to encrypt stored credentials.
+	// Prefer GatewaySecretFile; this field is only populated from env GATEWAY_SECRET.
+	GatewaySecret string `toml:"-"`
+	// GatewaySecretFile is the path to a file whose content is used as GatewaySecret.
+	// Reading from a file avoids exposing the secret in /proc/<pid>/environ.
+	GatewaySecretFile string `toml:"gateway_secret_file"`
 
 	// AdminPassword protects the admin UI and API with form-based authentication.
 	// Set via ADMIN_PASSWORD env var or admin.password in config file.
@@ -56,6 +65,13 @@ type Config struct {
 	// The API key is never exposed to the browser.
 	OpenAIAPIKey string `toml:"openai_api_key"`
 	OpenAIModel  string `toml:"openai_model"`
+	// ChatTimeoutSeconds is the HTTP timeout when proxying requests to OpenAI (default 60).
+	ChatTimeoutSeconds int `toml:"chat_timeout_seconds"`
+
+	// OAuthTimeoutSeconds is the HTTP timeout for OAuth2 token endpoint requests (default 10).
+	OAuthTimeoutSeconds int `toml:"oauth_timeout_seconds"`
+	// OAuthDefaultExpirySeconds is used when the token endpoint omits expires_in (default 300).
+	OAuthDefaultExpirySeconds int `toml:"oauth_default_expiry_seconds"`
 
 	TLS  TLSConfig  `toml:"tls"`
 	MTLS MTLSConfig `toml:"mtls"`
@@ -65,12 +81,16 @@ type Config struct {
 // DefaultConfig returns a Config populated with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
-		ListenAddr:       ":8080",
-		DataDir:          "./data",
-		LogLevel:         "info",
-		MaxResponseBytes: 1048576,
-		OpenAIModel:      "gpt-4o",
-		AdminSessionTTL:  24,
+		ListenAddr:                ":8080",
+		DataDir:                   "./data",
+		LogLevel:                  "info",
+		MaxResponseBytes:          1048576,
+		MaxRequestBytes:           1048576,
+		OpenAIModel:               "gpt-4o",
+		AdminSessionTTL:           24,
+		ChatTimeoutSeconds:        60,
+		OAuthTimeoutSeconds:       10,
+		OAuthDefaultExpirySeconds: 300,
 		CORS: CORSConfig{
 			AllowedOrigins: []string{},
 			AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -112,10 +132,29 @@ func Load(path string) (*Config, error) {
 			cfg.MaxResponseBytes = n
 		}
 	}
+	if v := os.Getenv("MAX_REQUEST_BYTES"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.MaxRequestBytes = n
+		}
+	}
 	if v := os.Getenv("UI_DEV_PROXY"); v != "" {
 		cfg.UIDevProxy = v
 	}
-	cfg.GatewaySecret = os.Getenv("GATEWAY_SECRET")
+
+	// Gateway secret: prefer file over env to avoid /proc/<pid>/environ exposure.
+	if v := os.Getenv("GATEWAY_SECRET_FILE"); v != "" {
+		cfg.GatewaySecretFile = v
+	}
+	if cfg.GatewaySecretFile != "" {
+		if raw, err := os.ReadFile(cfg.GatewaySecretFile); err == nil {
+			cfg.GatewaySecret = strings.TrimSpace(string(raw))
+		}
+	}
+	// Env GATEWAY_SECRET overrides file if explicitly set.
+	if v := os.Getenv("GATEWAY_SECRET"); v != "" {
+		cfg.GatewaySecret = v
+	}
+
 	if v := os.Getenv("ADMIN_PASSWORD"); v != "" {
 		cfg.AdminPassword = v
 	}
@@ -130,6 +169,18 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.AdminSessionTTL <= 0 {
 		cfg.AdminSessionTTL = 24
+	}
+	if cfg.MaxRequestBytes <= 0 {
+		cfg.MaxRequestBytes = 1048576
+	}
+	if cfg.ChatTimeoutSeconds <= 0 {
+		cfg.ChatTimeoutSeconds = 60
+	}
+	if cfg.OAuthTimeoutSeconds <= 0 {
+		cfg.OAuthTimeoutSeconds = 10
+	}
+	if cfg.OAuthDefaultExpirySeconds <= 0 {
+		cfg.OAuthDefaultExpirySeconds = 300
 	}
 	// Apply CORS defaults if not set by file or env.
 	if len(cfg.CORS.AllowedMethods) == 0 {
@@ -176,6 +227,16 @@ log_level = "info"
 # Maximum bytes read from an upstream API response (default 1 MiB).
 max_response_bytes = 1048576
 
+# Maximum bytes accepted in an inbound request body (default 1 MiB).
+max_request_bytes = 1048576
+
+# ── Gateway secret ────────────────────────────────────────────────────────────
+# Used to encrypt stored credentials (OAuth2 client secrets, etc.).
+# Prefer gateway_secret_file over env GATEWAY_SECRET to avoid exposing the
+# secret in /proc/<pid>/environ on Linux.
+# gateway_secret_file = "/run/secrets/gateway_secret"
+# (Alternatively: export GATEWAY_SECRET="..." in the process environment)
+
 # ── Admin authentication ───────────────────────────────────────────────────────
 # Set a password to protect the admin UI and API with form-based authentication.
 # Can also be set via the ADMIN_PASSWORD environment variable.
@@ -190,6 +251,16 @@ admin_session_ttl_hours = 24
 # The key is never sent to the browser.
 # openai_api_key = "sk-..."
 openai_model = "gpt-4o"
+
+# HTTP timeout in seconds when proxying requests to OpenAI (default 60).
+chat_timeout_seconds = 60
+
+# ── OAuth2 token fetch settings ───────────────────────────────────────────────
+# HTTP timeout for OAuth2 token endpoint requests (default 10 seconds).
+oauth_timeout_seconds = 10
+# Fallback token lifetime when expires_in is absent from the token response.
+# Conservative default of 300 s prevents stale token use (default 300).
+oauth_default_expiry_seconds = 300
 
 # ── CORS (Cross-Origin Resource Sharing) ──────────────────────────────────────
 # allowed_origins: list of origins permitted to make cross-origin requests.

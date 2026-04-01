@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -76,11 +77,22 @@ Options:
 	reg := registry.NewRegistry()
 	admin.RebuildRegistryFromStore(jsonStore, reg)
 
+	// Registry subscription goroutine: exits when ctx is cancelled on shutdown.
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	regCh := reg.Subscribe()
 	go func() {
-		for range regCh {
-			tools := reg.List()
-			telemetry.RegistryToolsTotal.Set(float64(len(tools)))
+		defer reg.Unsubscribe(regCh)
+		for {
+			select {
+			case <-shutdownCtx.Done():
+				return
+			case _, ok := <-regCh:
+				if !ok {
+					return
+				}
+				tools := reg.List()
+				telemetry.RegistryToolsTotal.Set(float64(len(tools)))
+			}
 		}
 	}()
 
@@ -139,6 +151,9 @@ Options:
 		Handler: mux,
 	}
 
+	// cmuxInst holds the multiplexer when TLS mode is active so we can close it on shutdown.
+	var cmuxInst cmux.CMux
+
 	if cfg.TLS.Enabled {
 		cert, err := tlsutil.LoadTLSCertificate(cfg.TLS.CertFile, cfg.TLS.KeyFile)
 		if err != nil {
@@ -157,26 +172,34 @@ Options:
 		}
 
 		m := cmux.New(ln)
+		cmuxInst = m
 		tlsL := m.Match(cmux.TLS())
 		httpL := m.Match(cmux.Any())
 
 		tlsListener := tls.NewListener(tlsL, tlsCfg)
 
+		var cmuxWG sync.WaitGroup
+		cmuxWG.Add(3)
 		go func() {
+			defer cmuxWG.Done()
 			if err := server.Serve(tlsListener); err != nil && err != http.ErrServerClosed {
 				logger.Error("TLS server error", "error", err)
 			}
 		}()
 		go func() {
+			defer cmuxWG.Done()
 			if err := server.Serve(httpL); err != nil && err != http.ErrServerClosed {
 				logger.Error("HTTP server error", "error", err)
 			}
 		}()
 		go func() {
+			defer cmuxWG.Done()
 			if err := m.Serve(); err != nil {
 				logger.Error("cmux error", "error", err)
 			}
 		}()
+		// Store WG on the server so shutdown can wait for goroutines.
+		_ = cmuxWG // goroutines drain when cmuxInst.Close() is called below
 
 		logger.Info("TLS enabled on addr (HTTP and HTTPS)", "addr", cfg.ListenAddr)
 	} else {
@@ -189,16 +212,22 @@ Options:
 		}()
 	}
 
-	sigCh := make(chan os.Signal, 1)
+	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
 	logger.Info("shutting down...")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	shutdownCancel() // stop registry subscription goroutine
 
-	if err := server.Shutdown(ctx); err != nil {
+	httpCtx, httpCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer httpCancel()
+
+	if err := server.Shutdown(httpCtx); err != nil {
 		slog.Error("shutdown error", "error", err)
+	}
+	// Close cmux after HTTP server drains so sub-listeners are also closed.
+	if cmuxInst != nil {
+		cmuxInst.Close()
 	}
 	jsonStore.Close()
 	logger.Info("shutdown complete")

@@ -13,6 +13,12 @@ import (
 	"github.com/prasenjit-net/mcp-gateway/spec"
 )
 
+// allowedMethods is the set of HTTP methods the proxy will forward.
+var allowedMethods = map[string]struct{}{
+	"GET": {}, "POST": {}, "PUT": {}, "PATCH": {},
+	"DELETE": {}, "HEAD": {}, "OPTIONS": {},
+}
+
 type BuildInput struct {
 	Tool        *spec.ToolDefinition
 	Arguments   map[string]interface{}
@@ -27,21 +33,30 @@ func Build(ctx context.Context, input BuildInput) (*http.Request, error) {
 		args[k] = v
 	}
 
+	// Validate the upstream base URL before touching it.
+	if _, err := url.ParseRequestURI(strings.TrimRight(tool.Upstream, "/")); err != nil {
+		return nil, fmt.Errorf("invalid upstream URL: %w", err)
+	}
+
 	pathStr := tool.PathTemplate
 	for k, v := range args {
 		placeholder := "{" + k + "}"
 		if strings.Contains(pathStr, placeholder) {
-			pathStr = strings.ReplaceAll(pathStr, placeholder, fmt.Sprintf("%v", v))
+			// URL-encode the value to prevent path injection.
+			pathStr = strings.ReplaceAll(pathStr, placeholder, url.PathEscape(fmt.Sprintf("%v", v)))
 			delete(args, k)
 		}
 	}
 
 	rawURL := strings.TrimRight(tool.Upstream, "/") + pathStr
 
+	method := strings.ToUpper(tool.Method)
+	if _, ok := allowedMethods[method]; !ok {
+		return nil, fmt.Errorf("disallowed HTTP method: %s", tool.Method)
+	}
+
 	var req *http.Request
 	var err error
-
-	method := strings.ToUpper(tool.Method)
 
 	switch method {
 	case "GET", "DELETE", "HEAD":
@@ -77,10 +92,6 @@ func Build(ctx context.Context, input BuildInput) (*http.Request, error) {
 		if len(args) > 0 {
 			req.Header.Set("Content-Type", "application/json")
 		}
-	}
-
-	if _, err := url.ParseRequestURI(rawURL); err != nil {
-		return nil, fmt.Errorf("invalid upstream URL: %w", err)
 	}
 
 	req.Header.Set("X-MCP-Gateway", "1")

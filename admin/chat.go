@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/prasenjit-net/mcp-gateway/config"
 )
 
 const openAICompletionsURL = "https://api.openai.com/v1/chat/completions"
+
+// maxStreamBytes caps the total bytes read from an OpenAI streaming response (32 MiB).
+const maxStreamBytes = 32 * 1024 * 1024
 
 type chatHandler struct {
 	config *config.Config
@@ -39,6 +43,9 @@ func (h *chatHandler) Completions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	timeout := time.Duration(h.config.ChatTimeoutSeconds) * time.Second
+	client := &http.Client{Timeout: timeout}
+
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, openAICompletionsURL, r.Body)
 	if err != nil {
 		jsonError(w, "failed to build upstream request", http.StatusInternalServerError)
@@ -47,7 +54,7 @@ func (h *chatHandler) Completions(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+h.config.OpenAIAPIKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		jsonError(w, "upstream request failed: "+err.Error(), http.StatusBadGateway)
 		return
@@ -62,13 +69,16 @@ func (h *chatHandler) Completions(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 
-	// Stream the body back; flush after each write so SSE chunks arrive promptly.
+	// Stream the body back with a size cap; flush after each write so SSE chunks arrive promptly.
 	flusher, canFlush := w.(http.Flusher)
 	buf := make([]byte, 4096)
+	limited := io.LimitReader(resp.Body, maxStreamBytes)
 	for {
-		n, readErr := resp.Body.Read(buf)
+		n, readErr := limited.Read(buf)
 		if n > 0 {
-			w.Write(buf[:n]) //nolint:errcheck
+			if _, werr := w.Write(buf[:n]); werr != nil {
+				return
+			}
 			if canFlush {
 				flusher.Flush()
 			}

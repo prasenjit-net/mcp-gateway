@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -21,8 +22,9 @@ func (t *HTTPTransport) Handle(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
+	limitedBody := io.LimitReader(r.Body, t.deps.Config.MaxRequestBytes)
 	var raw json.RawMessage
-	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&raw); err != nil {
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
 		return
 	}

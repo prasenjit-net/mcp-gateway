@@ -219,3 +219,86 @@ func TestDefaultConfigContentParseable(t *testing.T) {
 		t.Errorf("DefaultConfigContent should not have a pre-set OpenAIAPIKey")
 	}
 }
+
+func TestGatewaySecretFile(t *testing.T) {
+dir := t.TempDir()
+secretFile := filepath.Join(dir, "gateway_secret")
+if err := os.WriteFile(secretFile, []byte("  my-secret-value\n"), 0o600); err != nil {
+t.Fatal(err)
+}
+cfgFile := filepath.Join(dir, "config.toml")
+if err := os.WriteFile(cfgFile, []byte(`gateway_secret_file = "`+secretFile+`"`), 0o644); err != nil {
+t.Fatal(err)
+}
+cfg, err := config.Load(cfgFile)
+if err != nil {
+t.Fatal(err)
+}
+if cfg.GatewaySecret != "my-secret-value" {
+t.Errorf("GatewaySecret = %q, want my-secret-value (whitespace trimmed)", cfg.GatewaySecret)
+}
+}
+
+func TestMaxRequestBytesDefault(t *testing.T) {
+cfg, _ := config.Load("/tmp/no-file-maxreq.toml")
+if cfg.MaxRequestBytes <= 0 {
+t.Error("MaxRequestBytes should have a positive default")
+}
+}
+
+func TestOAuthAndChatTimeoutDefaults(t *testing.T) {
+cfg, _ := config.Load("/tmp/no-file-timeouts.toml")
+if cfg.ChatTimeoutSeconds <= 0 {
+t.Error("ChatTimeoutSeconds should have a positive default")
+}
+if cfg.OAuthTimeoutSeconds <= 0 {
+t.Error("OAuthTimeoutSeconds should have a positive default")
+}
+if cfg.OAuthDefaultExpirySeconds <= 0 {
+t.Error("OAuthDefaultExpirySeconds should have a positive default")
+}
+}
+
+func TestGatewaySecretFileEnvVar(t *testing.T) {
+dir := t.TempDir()
+secretFile := dir + "/sec.txt"
+if err := os.WriteFile(secretFile, []byte("env-secret\n"), 0o600); err != nil {
+t.Fatal(err)
+}
+t.Setenv("GATEWAY_SECRET_FILE", secretFile)
+cfg, err := config.Load("/tmp/no-file-gs.toml")
+if err != nil {
+t.Fatal(err)
+}
+if cfg.GatewaySecret != "env-secret" {
+t.Errorf("GatewaySecret = %q, want env-secret", cfg.GatewaySecret)
+}
+}
+
+func TestGatewaySecretEnvOverridesFile(t *testing.T) {
+dir := t.TempDir()
+secretFile := dir + "/sec2.txt"
+if err := os.WriteFile(secretFile, []byte("file-secret\n"), 0o600); err != nil {
+t.Fatal(err)
+}
+t.Setenv("GATEWAY_SECRET_FILE", secretFile)
+t.Setenv("GATEWAY_SECRET", "env-wins")
+cfg, err := config.Load("/tmp/no-file-gs2.toml")
+if err != nil {
+t.Fatal(err)
+}
+if cfg.GatewaySecret != "env-wins" {
+t.Errorf("GatewaySecret = %q, want env-wins (env GATEWAY_SECRET overrides file)", cfg.GatewaySecret)
+}
+}
+
+func TestMaxRequestBytesEnvVar(t *testing.T) {
+t.Setenv("MAX_REQUEST_BYTES", "2048")
+cfg, err := config.Load("/tmp/no-file-mrb.toml")
+if err != nil {
+t.Fatal(err)
+}
+if cfg.MaxRequestBytes != 2048 {
+t.Errorf("MaxRequestBytes = %d, want 2048", cfg.MaxRequestBytes)
+}
+}

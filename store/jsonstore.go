@@ -287,9 +287,12 @@ func (s *JSONStore) DeleteResource(id string) error {
 	if err != nil {
 		return err
 	}
-	// Remove stored file if present
+	// Remove stored file if present, validating path stays within DataDir.
 	if rec.FilePath != "" {
-		absPath := filepath.Join(s.dataDir, rec.FilePath)
+		absPath, err := SafeJoin(s.dataDir, rec.FilePath)
+		if err != nil {
+			return fmt.Errorf("invalid resource file path: %w", err)
+		}
 		_ = os.Remove(absPath)
 		// Remove parent dir if empty
 		parentDir := filepath.Dir(absPath)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/prasenjit-net/mcp-gateway/auth"
@@ -295,3 +296,83 @@ func TestHTTPTransportNotification(t *testing.T) {
 	}
 }
 
+func TestHandleResourcesReadInvalidFilePath(t *testing.T) {
+h := buildHandlerDeps(t)
+h.Registry.RebuildResources([]*store.ResourceRecord{{
+ID:       "traversal-res",
+Name:     "traversal",
+Type:     "file",
+FilePath: "../../../etc/passwd",
+MimeType: "text/plain",
+}})
+req := makeReq("resources/read", 1, map[string]interface{}{
+"uri": "gateway://resources/traversal-res",
+})
+resp := h.Handle(context.Background(), req, nil)
+if resp.Error == nil {
+t.Error("expected error for traversal path, got nil error")
+}
+}
+
+func TestHTTPTransportBodySizeLimit(t *testing.T) {
+h := buildHandlerDeps(t)
+h.Config.MaxRequestBytes = 64
+transport := mcp.NewHTTPTransport(h)
+
+bigBody := strings.Repeat("x", 200)
+req := httptest.NewRequest("POST", "/mcp", strings.NewReader(bigBody))
+w := httptest.NewRecorder()
+transport.Handle(w, req)
+if w.Code == http.StatusOK {
+t.Error("expected non-200 for oversized body")
+}
+}
+
+func TestHandleResourcesReadFile(t *testing.T) {
+h := buildHandlerDeps(t)
+// Create an actual file in the data dir
+content := "hello resource"
+filePath := "test-resource.txt"
+fullPath := h.Config.DataDir + "/" + filePath
+if err := os.WriteFile(fullPath, []byte(content), 0o600); err != nil {
+t.Fatalf("write file: %v", err)
+}
+h.Registry.RebuildResources([]*store.ResourceRecord{{
+ID:       "file-res",
+Name:     "File Resource",
+Type:     "file",
+FilePath: filePath,
+MimeType: "text/plain",
+}})
+req := makeReq("resources/read", 1, map[string]interface{}{
+"uri": "gateway://resources/file-res",
+})
+resp := h.Handle(context.Background(), req, nil)
+if resp.Error != nil {
+t.Fatalf("unexpected error: %v", resp.Error.Message)
+}
+}
+
+func TestHTTPTransportBodySizeLimitBatch(t *testing.T) {
+h := buildHandlerDeps(t)
+h.Config.MaxRequestBytes = 32
+transport := mcp.NewHTTPTransport(h)
+
+// A batch payload bigger than the limit
+big := strings.Repeat(`{"jsonrpc":"2.0"}`, 10)
+req := httptest.NewRequest("POST", "/mcp", strings.NewReader("["+big+"]"))
+w := httptest.NewRecorder()
+transport.Handle(w, req)
+// Should not be 200 OK since the truncated body won't parse as valid JSON
+if w.Code == http.StatusOK {
+t.Error("expected non-200 for oversized batch body")
+}
+}
+
+func TestSSEServerActiveSessionCount(t *testing.T) {
+h := buildHandlerDeps(t)
+srv := mcp.NewSSEServer(h)
+if srv.ActiveSessionCount() != 0 {
+t.Errorf("expected 0 active sessions, got %d", srv.ActiveSessionCount())
+}
+}

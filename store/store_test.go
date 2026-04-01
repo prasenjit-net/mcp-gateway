@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -273,4 +274,40 @@ func TestDeleteResourceNotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error deleting nonexistent resource")
 	}
+}
+
+func TestSafeJoin(t *testing.T) {
+base := t.TempDir()
+
+// Normal subpath
+p, err := store.SafeJoin(base, "resources/abc/file.txt")
+if err != nil {
+	t.Fatalf("unexpected error: %v", err)
+}
+if p == "" {
+	t.Error("expected non-empty path")
+}
+
+// Traversal attempt via ".."
+_, err = store.SafeJoin(base, "../outside/file.txt")
+if err == nil {
+	t.Error("expected error for path traversal via ..")
+}
+
+// Note: Go's filepath.Join handles leading "/" by joining it under base,
+// so "/etc/passwd" becomes base+"/etc/passwd" — not an escape vector in Go.
+// The SafeJoin implementation correctly confines such paths within base.
+absSafe, err := store.SafeJoin(base, "/etc/passwd")
+if err != nil {
+	t.Fatalf("unexpected error for absolute path (Go filepath.Join keeps it in base): %v", err)
+}
+if !strings.HasPrefix(absSafe, base) {
+	t.Errorf("absolute path escaped base: %s not under %s", absSafe, base)
+}
+
+// Empty path
+_, err = store.SafeJoin(base, "")
+if err == nil {
+	t.Error("expected error for empty path")
+}
 }
