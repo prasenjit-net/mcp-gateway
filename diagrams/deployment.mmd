@@ -1,0 +1,7 @@
+graph LR
+    subgraph Docker["🐳 Docker Compose"]
+        GW["mcp-gateway container\nport 8080\nvolume: gateway-data:/data"]
+        MOCK["mock-api container\nhttpbin · port 8081"]
+    end
+    HOST["Host / Browser"] -->|"8080"| GW
+    GW -->|"HTTP"| MOCK

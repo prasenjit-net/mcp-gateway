@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="618" viewBox="0 0 1200 618"
+     xmlns="http://www.w3.org/2000/svg"
+     font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <!-- Right-pointing arrowhead -->
+    <marker id="arr-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <path d="M0,0 L10,3.5 L0,7 Z" fill="#94A3B8"/>
+    </marker>
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00000018"/>
+    </filter>
+    <!-- Clip gateway header to rounded top only -->
+    <clipPath id="clipGwHeader">
+      <rect x="248" y="88" width="704" height="56" rx="12"/>
+    </clipPath>
+  </defs>
+
+  <!-- ===================== BACKGROUND ===================== -->
+  <rect width="1200" height="618" fill="#EEF2F7"/>
+
+  <!-- ===================== TITLE BAR ===================== -->
+  <rect width="1200" height="52" fill="#0F2B5B"/>
+  <text x="600" y="34" text-anchor="middle" fill="#FFFFFF"
+        font-size="21" font-weight="700" letter-spacing="0.4">
+    MCP Gateway — Architecture Overview
+  </text>
+
+  <!-- Subtitle -->
+  <text x="600" y="72" text-anchor="middle" fill="#64748B" font-size="12">
+    Translates OpenAPI specifications into AI-accessible MCP tools — secure, observable, and centrally managed
+  </text>
+
+  <!-- Column labels -->
+  <text x="125" y="104" text-anchor="middle" fill="#94A3B8"
+        font-size="10" font-weight="700" letter-spacing="2">CLIENTS</text>
+  <text x="1075" y="104" text-anchor="middle" fill="#94A3B8"
+        font-size="10" font-weight="700" letter-spacing="2">BACKENDS</text>
+
+  <!-- ===================== GATEWAY OUTER BOX ===================== -->
+  <rect x="248" y="88" width="704" height="480" rx="12"
+        fill="white" stroke="#CBD5E1" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <!-- Gateway header (navy, clipped to rounded top) -->
+  <rect x="248" y="88" width="704" height="56" fill="#0F2B5B"
+        clip-path="url(#clipGwHeader)"/>
+  <!-- Extend fill down to make bottom edge straight -->
+  <rect x="248" y="120" width="704" height="24" fill="#0F2B5B"/>
+
+  <text x="600" y="115" text-anchor="middle" fill="#FFFFFF"
+        font-size="15" font-weight="700" letter-spacing="2">MCP GATEWAY</text>
+  <text x="600" y="133" text-anchor="middle" fill="#93C5FD" font-size="10.5">
+    Single Binary · Go · Port :8080 · TLS / mTLS
+  </text>
+
+  <!-- ===================================================
+       INNER SECTION 1 — MCP Transport Layer
+       =================================================== -->
+  <rect x="264" y="150" width="672" height="88" rx="7"
+        fill="#EFF6FF" stroke="#93C5FD" stroke-width="1.5"/>
+  <!-- Left accent bar -->
+  <rect x="264" y="150" width="5" height="88" rx="3" fill="#3B82F6"/>
+
+  <text x="600" y="177" text-anchor="middle" fill="#1D4ED8"
+        font-size="13" font-weight="700">MCP Transport Layer</text>
+  <text x="600" y="196" text-anchor="middle" fill="#3B82F6" font-size="11.5">
+    JSON-RPC 2.0 · Server-Sent Events (SSE) · HTTP Streaming
+  </text>
+  <text x="600" y="215" text-anchor="middle" fill="#64748B" font-size="10.5">
+    initialize · tools/list · tools/call · resources/list · resources/read · Session Management
+  </text>
+
+  <!-- ===================================================
+       INNER SECTION 2 — Middle Row (Auth | OpenAPI Bridge)
+       =================================================== -->
+
+  <!-- Auth & Security (left half) -->
+  <rect x="264" y="252" width="316" height="162" rx="7"
+        fill="#F0FDF4" stroke="#86EFAC" stroke-width="1.5"/>
+  <rect x="264" y="252" width="5" height="162" rx="3" fill="#16A34A"/>
+
+  <text x="422" y="278" text-anchor="middle" fill="#15803D"
+        font-size="13" font-weight="700">Auth &amp; Security</text>
+  <line x1="280" y1="287" x2="568" y2="287" stroke="#BBF7D0" stroke-width="1"/>
+
+  <text x="422" y="308" text-anchor="middle" fill="#166534" font-size="11">● API Key</text>
+  <text x="422" y="328" text-anchor="middle" fill="#166534" font-size="11">● Bearer Token</text>
+  <text x="422" y="348" text-anchor="middle" fill="#166534" font-size="11">● OAuth 2.0 (with token cache)</text>
+  <text x="422" y="368" text-anchor="middle" fill="#166534" font-size="11">● mTLS Client Certificates</text>
+  <text x="422" y="394" text-anchor="middle" fill="#64748B" font-size="10" font-style="italic">
+    Configurable per API specification
+  </text>
+
+  <!-- OpenAPI → MCP Bridge (right half) -->
+  <rect x="592" y="252" width="344" height="162" rx="7"
+        fill="#FFF7ED" stroke="#FED7AA" stroke-width="1.5"/>
+  <rect x="592" y="252" width="5" height="162" rx="3" fill="#EA580C"/>
+
+  <text x="764" y="278" text-anchor="middle" fill="#C2410C"
+        font-size="13" font-weight="700">OpenAPI → MCP Bridge</text>
+  <line x1="608" y1="287" x2="924" y2="287" stroke="#FED7AA" stroke-width="1"/>
+
+  <text x="764" y="308" text-anchor="middle" fill="#9A3412" font-size="11">● Parses OpenAPI 3.x specifications</text>
+  <text x="764" y="328" text-anchor="middle" fill="#9A3412" font-size="11">● Auto-generates MCP Tool definitions</text>
+  <text x="764" y="348" text-anchor="middle" fill="#9A3412" font-size="11">● In-memory Tools &amp; Resources Registry</text>
+  <text x="764" y="368" text-anchor="middle" fill="#9A3412" font-size="11">● HTTP Proxy with connection pooling</text>
+  <text x="764" y="394" text-anchor="middle" fill="#64748B" font-size="10" font-style="italic">
+    Live-reload on spec change · SSE push notifications
+  </text>
+
+  <!-- ===================================================
+       INNER SECTION 3 — Admin Console & Observability
+       =================================================== -->
+  <rect x="264" y="428" width="672" height="122" rx="7"
+        fill="#F5F3FF" stroke="#C4B5FD" stroke-width="1.5"/>
+  <rect x="264" y="428" width="5" height="122" rx="3" fill="#7C3AED"/>
+
+  <text x="600" y="452" text-anchor="middle" fill="#6D28D9"
+        font-size="13" font-weight="700">Admin Console &amp; Observability</text>
+  <line x1="280" y1="460" x2="924" y2="460" stroke="#DDD6FE" stroke-width="1"/>
+
+  <!-- 4 sub-columns: centers at 348, 516, 684, 852 -->
+  <!-- Col 1: Web UI -->
+  <text x="348" y="478" text-anchor="middle" fill="#5B21B6" font-size="11.5" font-weight="600">Web UI</text>
+  <text x="348" y="495" text-anchor="middle" fill="#7C3AED" font-size="10.5">React SPA (embedded)</text>
+  <text x="348" y="511" text-anchor="middle" fill="#7C3AED" font-size="10.5">Spec &amp; Auth management</text>
+  <text x="348" y="527" text-anchor="middle" fill="#7C3AED" font-size="10.5">Live tool browser</text>
+
+  <line x1="432" y1="464" x2="432" y2="540" stroke="#DDD6FE" stroke-width="1"/>
+
+  <!-- Col 2: REST API -->
+  <text x="516" y="478" text-anchor="middle" fill="#5B21B6" font-size="11.5" font-weight="600">REST API</text>
+  <text x="516" y="495" text-anchor="middle" fill="#7C3AED" font-size="10.5">Specs &amp; Operations CRUD</text>
+  <text x="516" y="511" text-anchor="middle" fill="#7C3AED" font-size="10.5">Resource management</text>
+  <text x="516" y="527" text-anchor="middle" fill="#7C3AED" font-size="10.5">Stats &amp; Health check</text>
+
+  <line x1="600" y1="464" x2="600" y2="540" stroke="#DDD6FE" stroke-width="1"/>
+
+  <!-- Col 3: Prometheus -->
+  <text x="684" y="478" text-anchor="middle" fill="#5B21B6" font-size="11.5" font-weight="600">Prometheus</text>
+  <text x="684" y="495" text-anchor="middle" fill="#7C3AED" font-size="10.5">Request counters</text>
+  <text x="684" y="511" text-anchor="middle" fill="#7C3AED" font-size="10.5">Latency histograms</text>
+  <text x="684" y="527" text-anchor="middle" fill="#7C3AED" font-size="10.5">Active sessions gauge</text>
+
+  <line x1="768" y1="464" x2="768" y2="540" stroke="#DDD6FE" stroke-width="1"/>
+
+  <!-- Col 4: Audit Logs -->
+  <text x="852" y="478" text-anchor="middle" fill="#5B21B6" font-size="11.5" font-weight="600">Audit Logs</text>
+  <text x="852" y="495" text-anchor="middle" fill="#7C3AED" font-size="10.5">Structured (slog)</text>
+  <text x="852" y="511" text-anchor="middle" fill="#7C3AED" font-size="10.5">JSON / text format</text>
+  <text x="852" y="527" text-anchor="middle" fill="#7C3AED" font-size="10.5">stdout / file</text>
+
+  <!-- ===================== LEFT COLUMN: CLIENTS ===================== -->
+
+  <!-- Card 1: AI / LLM Agents  (cy ≈ 194) -->
+  <rect x="28" y="150" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="28" y="150" width="5" height="88" rx="3" fill="#3B82F6"/>
+  <text x="130" y="179" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">AI / LLM Agents</text>
+  <text x="130" y="199" text-anchor="middle" fill="#64748B" font-size="11">MCP Protocol Clients</text>
+  <text x="130" y="217" text-anchor="middle" fill="#94A3B8" font-size="10">Claude · GPT · Cursor · Cline</text>
+
+  <!-- Card 2: Admin Console  (cy ≈ 323) -->
+  <rect x="28" y="279" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="28" y="279" width="5" height="88" rx="3" fill="#7C3AED"/>
+  <text x="130" y="308" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">Admin Console</text>
+  <text x="130" y="328" text-anchor="middle" fill="#64748B" font-size="11">Web Browser</text>
+  <text x="130" y="346" text-anchor="middle" fill="#94A3B8" font-size="10">React SPA · API Management</text>
+
+  <!-- Card 3: Monitoring  (cy ≈ 469) -->
+  <rect x="28" y="425" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="28" y="425" width="5" height="88" rx="3" fill="#0D9488"/>
+  <text x="130" y="454" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">Monitoring</text>
+  <text x="130" y="474" text-anchor="middle" fill="#64748B" font-size="11">Prometheus Scraper</text>
+  <text x="130" y="492" text-anchor="middle" fill="#94A3B8" font-size="10">GET /metrics · Alertmanager</text>
+
+  <!-- ===================== RIGHT COLUMN: BACKENDS ===================== -->
+
+  <!-- Backend 1: Upstream REST APIs  (cy ≈ 194) -->
+  <rect x="978" y="150" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="978" y="150" width="5" height="88" rx="3" fill="#059669"/>
+  <text x="1072" y="179" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">Upstream REST APIs</text>
+  <text x="1072" y="199" text-anchor="middle" fill="#64748B" font-size="11">Internal &amp; External Services</text>
+  <text x="1072" y="217" text-anchor="middle" fill="#94A3B8" font-size="10">HTTP · HTTPS · mTLS</text>
+
+  <!-- Backend 2: OpenAI API  (cy ≈ 323) -->
+  <rect x="978" y="279" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="978" y="279" width="5" height="88" rx="3" fill="#0284C7"/>
+  <text x="1072" y="308" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">OpenAI API</text>
+  <text x="1072" y="328" text-anchor="middle" fill="#64748B" font-size="11">Chat Completions</text>
+  <text x="1072" y="346" text-anchor="middle" fill="#94A3B8" font-size="10">Server-side key · HTTPS</text>
+
+  <!-- Backend 3: JSON File Store  (cy ≈ 469) -->
+  <rect x="978" y="425" width="194" height="88" rx="8"
+        fill="white" stroke="#E2E8F0" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="978" y="425" width="5" height="88" rx="3" fill="#D97706"/>
+  <text x="1072" y="454" text-anchor="middle" fill="#0F2B5B"
+        font-size="13" font-weight="700">JSON File Store</text>
+  <text x="1072" y="474" text-anchor="middle" fill="#64748B" font-size="11">Persistent Configuration</text>
+  <text x="1072" y="492" text-anchor="middle" fill="#94A3B8" font-size="10">Specs · Auth · Stats · Resources</text>
+
+  <!-- ===================== ARROWS ===================== -->
+
+  <!-- AI / LLM Agents → Gateway (y=194) -->
+  <line x1="222" y1="194" x2="246" y2="194"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="234" y="188" text-anchor="middle" fill="#94A3B8" font-size="9">MCP</text>
+
+  <!-- Admin Console → Gateway (y=323) -->
+  <line x1="222" y1="323" x2="246" y2="323"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="234" y="317" text-anchor="middle" fill="#94A3B8" font-size="9">HTTPS</text>
+
+  <!-- Monitoring → Gateway (y=469) -->
+  <line x1="222" y1="469" x2="246" y2="469"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="234" y="463" text-anchor="middle" fill="#94A3B8" font-size="9">HTTP</text>
+
+  <!-- Gateway → Upstream REST APIs (y=194) -->
+  <line x1="952" y1="194" x2="976" y2="194"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="964" y="188" text-anchor="middle" fill="#94A3B8" font-size="9">REST</text>
+
+  <!-- Gateway → OpenAI API (y=323) -->
+  <line x1="952" y1="323" x2="976" y2="323"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="964" y="317" text-anchor="middle" fill="#94A3B8" font-size="9">HTTPS</text>
+
+  <!-- Gateway ↔ JSON File Store (bidirectional, y=466/472) -->
+  <line x1="952" y1="466" x2="976" y2="466"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <!-- Return arrow: starts at right, ends at left (marker-end points left) -->
+  <line x1="976" y1="472" x2="952" y2="472"
+        stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arr-r)"/>
+  <text x="964" y="462" text-anchor="middle" fill="#94A3B8" font-size="9">R/W</text>
+
+  <!-- ===================== FOOTER ===================== -->
+  <text x="600" y="604" text-anchor="middle" fill="#94A3B8" font-size="10">
+    Single binary deployment · TLS + HTTP on one port (cmux) · Config via config.toml or environment variables · Docker-ready
+  </text>
+</svg>

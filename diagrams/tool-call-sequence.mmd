@@ -1,0 +1,35 @@
+sequenceDiagram
+    actor Agent as LLM Agent
+    participant SSE as SSE Transport
+    participant Handler as MCP Handler
+    participant Auth as Auth Chain
+    participant Proxy as HTTP Proxy
+    participant API as Upstream REST API
+    participant Store as JSON Store
+
+    Agent->>SSE: GET /mcp/sse (open SSE stream)
+    SSE-->>Agent: event: endpoint (sessionId)
+
+    Agent->>SSE: POST /mcp/sse/message?sessionId=X\n{"method":"initialize"}
+    SSE->>Handler: Handle(initialize)
+    Handler-->>SSE: InitializeResult (capabilities)
+    SSE-->>Agent: event: message (response)
+
+    Agent->>SSE: POST /mcp/sse/message\n{"method":"tools/list"}
+    SSE->>Handler: Handle(tools/list)
+    Handler->>Handler: registry.List()
+    Handler-->>Agent: [Tool1, Tool2, ...]
+
+    Agent->>SSE: POST /mcp/sse/message\n{"method":"tools/call","params":{"name":"tool1","arguments":{...}}}
+    SSE->>Handler: Handle(tools/call)
+    Handler->>Auth: getAuthenticator(specID)
+    Auth->>Store: GetAuth(specID)
+    Auth-->>Handler: Authenticator (e.g. OAuth2)
+    Handler->>Proxy: Build HTTP request\n(path template + args)
+    Handler->>Auth: ApplyChain (passthrough + configured)
+    Handler->>Proxy: DoMTLS(req, mtlsEnabled)
+    Proxy->>API: HTTP/HTTPS/mTLS request
+    API-->>Proxy: JSON response
+    Proxy-->>Handler: http.Response
+    Handler->>Store: IncrementStats(operationID, latency)
+    Handler-->>Agent: CallToolResult {content}
